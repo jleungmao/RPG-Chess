@@ -3,18 +3,47 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 using NameSpaces;
-public class Board : MonoBehaviour
+using Mirror;
+public class Board : NetworkBehaviour
 {
     public static int rows = 8; // x
-    public static int columns = 15; // z
+    public static int columns = 12; // z
     public Tile[,] board = new Tile[rows,columns]; 
+    public List<List<Tile>> syncBoard = new List<List<Tile>>();
     public GameObject tile;
     public Material material1;
     public Material material2;
+    private ChessNetworkManager room;
+    private ChessNetworkManager Room{
+        get{
+            if(room != null){
+                return room;
+            }
+            return room = NetworkManager.singleton as ChessNetworkManager;
+        }
+    }
+
 
     void Start()
     {
-        Debug.Log("RUNNNING");
+        DontDestroyOnLoad(gameObject);
+        CreateBoard();
+        
+        for(int i = 0; i<Room.GamePlayers.Count; i++){
+            Room.GamePlayers[i].Setup();
+        }
+        for(int i = 0; i<Room.GamePlayers.Count; i++){
+            Room.GamePlayers[i].GameSetup();
+        }
+
+    }
+
+    public void CreateBoard()
+    {
+        for(int i = 0; i < rows; i++){
+            syncBoard.Add(new List<Tile>());
+        }
+
         for(int i = 0; i < rows * columns; i++){
             int x = i % rows;
             int z = (int) Math.Floor((double)(i / rows));
@@ -26,46 +55,58 @@ public class Board : MonoBehaviour
                 obj.GetComponent<MeshRenderer>().material = material2;
             }
             obj.transform.SetParent(this.transform);
+            syncBoard[x].Add(obj.GetComponent<Tile>());
             board[x,z] = obj.GetComponent<Tile>();
         }
-
-        tile.SetActive(false);
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-
     }
 
     public Piece GetPiece(Vector3 position){
-        return board[(int) position.x, (int) position.z].GetPiece();
+        // return board[(int) position.x, (int) position.z].GetPiece();
+        return syncBoard[(int) position.x][(int) position.z].GetPiece();
     }
 
-    public void PlacePiece(Piece piece, Vector3 position){
+    [ClientRpc]
+    public void RpcPlacePiece(GameObject pieceObject, Vector3 position){
         if(IsFree(position)){
-            board[(int) position.x, (int) position.z].SetPiece(piece);
+            Piece piece = pieceObject.GetComponent<Piece>();
             piece.SetPosition(position);
+            
+            syncBoard[(int) position.x][(int) position.z].SetPiece(pieceObject);
+            board[(int) position.x,(int) position.z].SetPiece(pieceObject);
         }
     }
 
-    public void RemovePiece(Vector3 newPosition){
-        board[(int) newPosition.x, (int) newPosition.z].SetPiece(null);
+    [ClientRpc]
+    public void RpcRemovePiece(Vector3 position){
+        // board[(int) position.x, (int) position.z].SetPiece(null);
+        Debug.Log(position);
+        syncBoard[(int) position.x][(int) position.z].SetPiece(null);
     }
 
-    public void MovePiece(Piece piece, Vector3 newPosition){
-        if(IsFree(newPosition)){
-            Vector3 oldPosition = piece.GetPosition();
-            RemovePiece(oldPosition);
-            PlacePiece(piece, newPosition);
-            piece.StartMovementCooldown();
-        }
-    }
-
+    [Server]
     public int AttackSquare(Piece selected, Mode mode, Vector3 position){
-        Piece target = board[(int)position.x, (int)position.z].GetPiece();
+        // Piece target = board[(int)position.x, (int)position.z].GetPiece();
+        Piece target = syncBoard[(int)position.x][(int)position.z].GetPiece();
         if(target){
             if(mode == Mode.ATTACK){
+                if(selected.GetComponent<Miner>() != null){
+                    selected.Attack();
+                    return selected.GetAttack();
+                }
+                if(selected.GetComponent<Bishop>() != null){
+                    if(selected.GetAOEPattern() == null){
+                        selected.Attack();
+                        target.Damaged(-1*selected.GetAttack());
+                    }else{
+                        Piece[] tilesToHealArray = GenerateAOETiles(selected, mode, position);
+                        for(int i = 0; i<tilesToHealArray.Length;i++){
+                            target = tilesToHealArray[i];
+                            target.Damaged(-1*selected.GetAttack());
+                        }
+                        selected.Attack();
+                    }
+                    return 0;
+                }
                 if(selected.GetAOEPattern() == null){
                     return AttackPiece(selected,target);
                 }else{
@@ -80,43 +121,34 @@ public class Board : MonoBehaviour
                     }
                     return sum;
                 }
-                
-            }else if(mode == Mode.MINE){
-                selected.StartAttackCooldown();
-                return selected.GetAttack();
-            }else if(mode == Mode.HEAL){
-                if(selected.GetAOEPattern() == null){
-                    selected.StartAttackCooldown();
-                    target.ChangeHealth(-1*selected.GetAttack());
-                }else{
-                    Piece[] tilesToHealArray = GenerateAOETiles(selected, mode, position);
-                    for(int i = 0; i<tilesToHealArray.Length;i++){
-                        target = tilesToHealArray[i];
-                        target.ChangeHealth(-1*selected.GetAttack());
-                    }
-                    selected.StartAttackCooldown();
-                }
-                return 0;
             }
         }
         return 0;
     }
 
+    [Server]
     public int AttackPiece(Piece selected, Piece target){
-        selected.StartAttackCooldown();
-        bool isDead = target.ChangeHealth(selected.GetAttack()-target.GetDefense());
+        selected.Attack();
+		Debug.Log("Will attack");
+        bool isDead = target.Damaged(selected.GetAttack()-target.GetDefense());
         if(isDead){
-            Debug.Log("DIED");
+            Debug.Log($"{target} DIED with {target.GetHealthPercentage()}% health left");
             target.Die();
-            RemovePiece(target.GetPosition());
+            RpcRemovePiece(target.GetPosition());
             return target.GetValue();
         }
         return 0;
     }
 
+    [ClientRpc]
+    public void RpcKillAndDestroy(GameObject targetObject){
+        Piece target = targetObject.GetComponent<Piece>();
+        target.Die();
+    }
 
     public bool IsFree(Vector3 position){
-        return board[(int)position.x,(int)position.z].GetPiece() == null;
+        // return board[(int)position.x,(int)position.z].GetPiece() == null;
+        return syncBoard[(int)position.x][(int)position.z].GetPiece() == null;
     }
 
     public bool OnBoard(int x, int z){
@@ -127,8 +159,16 @@ public class Board : MonoBehaviour
         Vector3[] tiles = new Vector3[0];
 
         if(mode == Mode.ATTACK){
-            tiles = GenerateAttackValidTiles(piece);
-            HighlightTiles(tiles, new Color32(255,0,0,255));
+            if((piece.GetComponent<Miner>() != null)){
+                tiles = GenerateMineValidTiles(piece);
+                HighlightTiles(tiles,new Color32(255,0,0,255));
+            }else if((piece.GetComponent<Bishop>() != null)){
+                tiles = GenerateHealValidTiles(piece);
+                HighlightTiles(tiles, new Color32(0,255,0,255));
+            }else{
+                tiles = GenerateAttackValidTiles(piece);
+                HighlightTiles(tiles, new Color32(255,0,0,255));
+            }
             return tiles;
         }else if(mode == Mode.MOVE){
             tiles = GenerateMovementValidTiles(piece);
@@ -137,12 +177,6 @@ public class Board : MonoBehaviour
         }else if(mode == Mode.PLACE){
             tiles = GeneratePlaceValidTiles(placeTiles);
             HighlightTiles(tiles, new Color32(0,0,255,255));
-        }else if(mode == Mode.MINE){
-            tiles = GenerateMineValidTiles(piece);
-            HighlightTiles(tiles,new Color32(255,0,0,255));
-        }else if(mode == Mode.HEAL){
-            tiles = GenerateHealValidTiles(piece);
-            HighlightTiles(tiles, new Color32(0,255,0,255));
         }
 
         return tiles;
@@ -151,7 +185,8 @@ public class Board : MonoBehaviour
     public void HighlightTiles(Vector3[] tileArray, Color32 highlight){
         //highlight the tiles in tileArray
         foreach(Vector3 tilePosition in tileArray){
-            board[(int)tilePosition.x, (int)tilePosition.z].gameObject.GetComponent<Renderer>().material.color = highlight;
+            // board[(int)tilePosition.x, (int)tilePosition.z].gameObject.GetComponent<Renderer>().material.color = highlight;
+            syncBoard[(int)tilePosition.x][(int)tilePosition.z].gameObject.GetComponent<MeshRenderer>().material.color = highlight;
         }
     }
 
@@ -159,9 +194,11 @@ public class Board : MonoBehaviour
         //sets pieces to their original color
         foreach(Vector3 tilePosition in tileArray){
             if(((int)tilePosition.x + (int)tilePosition.z)%2 == 0){
-                board[(int)tilePosition.x, (int)tilePosition.z].gameObject.GetComponent<MeshRenderer>().material = material1;
+                // board[(int)tilePosition.x, (int)tilePosition.z].gameObject.GetComponent<MeshRenderer>().material = material1;
+                syncBoard[(int)tilePosition.x][(int)tilePosition.z].gameObject.GetComponent<MeshRenderer>().material = material1;
             }else{
-                board[(int)tilePosition.x, (int)tilePosition.z].gameObject.GetComponent<MeshRenderer>().material = material2;
+                // board[(int)tilePosition.x, (int)tilePosition.z].gameObject.GetComponent<MeshRenderer>().material = material2;
+                syncBoard[(int)tilePosition.x][(int)tilePosition.z].gameObject.GetComponent<MeshRenderer>().material = material2;
             }
         }
     }
@@ -194,7 +231,8 @@ public class Board : MonoBehaviour
 
             if(OnBoard(newX, newZ)){
                 Vector3 newPosition = new Vector3(newX, 0, newZ);
-                if(IsFree(newPosition) || board[newX,newZ].GetPiece().GetPlayer() != piece.GetPlayer())
+                // if(IsFree(newPosition) || board[newX,newZ].GetPiece().GetPlayer() != piece.GetPlayer())
+                if(IsFree(newPosition) || syncBoard[newX][newZ].GetPiece().GetPlayer() != piece.GetPlayer())
                     output.Add(new Vector3(newX, 0, newZ));
             }
         }
@@ -226,7 +264,8 @@ public class Board : MonoBehaviour
 
             if(OnBoard(newX, newZ)){
                 Vector3 newPosition = new Vector3(newX, 0, newZ);
-                if(IsFree(newPosition) || board[newX,newZ].GetPiece().GetPlayer() == piece.GetPlayer())
+                // if(IsFree(newPosition) || board[newX,newZ].GetPiece().GetPlayer() == piece.GetPlayer())
+                if(IsFree(newPosition) || syncBoard[newX][newZ].GetPiece().GetPlayer() == piece.GetPlayer())
                     output.Add(new Vector3(newX, 0, newZ));
             }
         }
@@ -235,7 +274,8 @@ public class Board : MonoBehaviour
     }
 
     private Piece[] GenerateAOETiles(Piece selected, Mode mode, Vector3 position){
-        Piece target = board[(int)position.x, (int)position.z].GetPiece();
+        // Piece target = board[(int)position.x, (int)position.z].GetPiece();
+        Piece target = syncBoard[(int)position.x][(int)position.z].GetPiece();
         Vector3[] aoeArray = selected.GetAOEPattern();
         List<Piece> tilesToAttack = new List<Piece>();
         tilesToAttack.Add(target);
@@ -245,13 +285,16 @@ public class Board : MonoBehaviour
 
             if(OnBoard(newX, newZ)){
                 Vector3 newPosition = new Vector3(newX, 0, newZ);
-                if(mode == Mode.HEAL){
-                    if(!IsFree(newPosition) && board[newX,newZ].GetPiece().GetPlayer() == selected.GetPlayer())
-                        tilesToAttack.Add(board[newX,newZ].GetPiece());
+                // if(!IsFree(newPosition) && board[newX,newZ].GetPiece().GetPlayer() != selected.GetPlayer())
+                //     tilesToAttack.Add(board[newX,newZ].GetPiece());
+                if(selected.GetComponent<Bishop>()!= null){
+                    if(!IsFree(newPosition) && syncBoard[newX][newZ].GetPiece().GetPlayer() == selected.GetPlayer())
+                        tilesToAttack.Add(syncBoard[newX][newZ].GetPiece());
                 }else{
-                    if(!IsFree(newPosition) && board[newX,newZ].GetPiece().GetPlayer() != selected.GetPlayer())
-                        tilesToAttack.Add(board[newX,newZ].GetPiece());
+                    if(!IsFree(newPosition) && syncBoard[newX][newZ].GetPiece().GetPlayer() != selected.GetPlayer())
+                    tilesToAttack.Add(syncBoard[newX][newZ].GetPiece());
                 }
+                
             }
         }
     

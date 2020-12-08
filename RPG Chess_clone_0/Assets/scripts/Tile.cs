@@ -1,20 +1,33 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
 
-public class Tile : MonoBehaviour
+public class Tile : NetworkBehaviour
 {
-    private Piece currentPiece;
+    [SyncVar(hook = nameof(UpdateTile))] public GameObject currentPiece;
     public Tile(){
         currentPiece = null;
     }
 
-    public void SetPiece(Piece piece){
-        currentPiece = piece;
+ 
+    public void SetPiece(GameObject piece){
+        if(piece == null)
+            currentPiece = null;
+        else
+            currentPiece = piece;
     }
 
     public Piece GetPiece(){
-        return currentPiece;
+        if(currentPiece == null)
+            return null;
+        else
+            return currentPiece.GetComponent<Piece>();
+    }
+
+    public void UpdateTile(GameObject oldValue, GameObject newValue){
+        Debug.Log("updating a tile");
+        currentPiece = newValue;
     }
 
 }

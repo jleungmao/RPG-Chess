@@ -20,4 +20,12 @@ public class Miner : Piece
         movementPattern = new Vector3[] {};
     }
 
+    override public void UpdateAnimation(){
+        Animator anim = GetComponent<Animator>();
+        if(GetAttackCooldownPercentage() == 1){
+            anim.SetBool("ready", true);
+        }else
+            anim.SetBool("ready", false);
+    }
+
 }

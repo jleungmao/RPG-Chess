@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using Mirror;
 
-public class Shop : MonoBehaviour
+public class Shop : NetworkBehaviour
 {
     // Start is called before the first frame update
-    public Player player;
+    public GamePlayer player;
     public ShopEntry selectedEntry;
     public int gold = 0;
     public int income = 0;
@@ -32,7 +33,7 @@ public class Shop : MonoBehaviour
         if(selectedEntry!=null){
             selectedEntry.gameObject.GetComponent<Button>().Select();
         }
-        if(NameSpaces.Mode.PLACE != player.GetMode()){
+        if(NameSpaces.Mode.PLACE != player.GetMode() && myEventSystem != null){
             myEventSystem.GetComponent<UnityEngine.EventSystems.EventSystem>().SetSelectedGameObject(null);
         }
     }
@@ -62,6 +63,7 @@ public class Shop : MonoBehaviour
         goldText.text = "Current Gold: " + gold;
     }
 
+
     public bool IsShopping(){
         return selectedEntry != null;
     }
@@ -70,6 +72,7 @@ public class Shop : MonoBehaviour
     public void ChangeIncome(int amount){
         income += amount;
     }
+
 
     public void GenerateGoldPassively(){
         if(currentIncomeCooldown <= 0){
