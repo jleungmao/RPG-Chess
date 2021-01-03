@@ -98,6 +98,10 @@ public class Piece : NetworkBehaviour
         return attack;
     }
 
+    public int GetAtk(){
+        return attack;
+    }
+
     public int GetDefense(){
         return defense;
     }
@@ -207,7 +211,6 @@ public class Piece : NetworkBehaviour
     }
 
     public void Die(){
-        gameObject.GetComponent<Animator>().Play("death");
         StartCoroutine(DieAnimation());
     }
 
@@ -248,5 +251,17 @@ public class Piece : NetworkBehaviour
     
     private void UpdateAttackCooldown(float oldValue, float newValue){
         currentAttackCooldown = newValue;
+    }
+
+    public int GetMaxHealth(){
+        return maxHealth;
+    }
+
+    public float GetAtkCd(){
+        return attackCooldown;
+    }
+
+    public float GetMoveCd(){
+        return movementCooldown;
     }
 }

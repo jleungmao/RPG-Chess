@@ -79,7 +79,6 @@ public class Board : NetworkBehaviour
     [ClientRpc]
     public void RpcRemovePiece(Vector3 position){
         // board[(int) position.x, (int) position.z].SetPiece(null);
-        Debug.Log(position);
         syncBoard[(int) position.x][(int) position.z].SetPiece(null);
     }
 
@@ -129,10 +128,13 @@ public class Board : NetworkBehaviour
     [Server]
     public int AttackPiece(Piece selected, Piece target){
         selected.Attack();
-		Debug.Log("Will attack");
+        bool changeIncome = target.GetComponent<Miner>() != null;
+        int player = selected.GetPlayer();
         bool isDead = target.Damaged(selected.GetAttack()-target.GetDefense());
         if(isDead){
-            Debug.Log($"{target} DIED with {target.GetHealthPercentage()}% health left");
+            if(changeIncome){
+                Room.GamePlayers[player].RpcChangeIncome(-1);
+            }
             target.Die();
             RpcRemovePiece(target.GetPosition());
             return target.GetValue();

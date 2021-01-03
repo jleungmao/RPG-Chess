@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
-public class ShopEntry : MonoBehaviour
+public class ShopEntry : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     public GameObject selectedPiece;
+    public GameObject pieceInfo;
     private int cost;
 
     public Shop shop;
@@ -28,6 +30,17 @@ public class ShopEntry : MonoBehaviour
 
     public int GetCost(){
         return cost;
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        pieceInfo.GetComponent<PieceInfo>().SetPiece(selectedPiece);
+        pieceInfo.GetComponent<PieceInfo>().SetX(transform.position.x);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        pieceInfo.GetComponent<PieceInfo>().SetPiece(null);
     }
 
 }

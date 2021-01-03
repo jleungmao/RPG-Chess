@@ -10,11 +10,11 @@ public class Knight : Piece
         attack = 20;
         defense = 5;
         position = new Vector3(0,0,0);
-        value = 5;
-        cost = 10;
+        value = 8;
+        cost = 20;
 
-        movementCooldown = 4;
-        attackCooldown = 6;
+        movementCooldown = 3;
+        attackCooldown = 5;
         attackPattern = generateAttackPattern();
         movementPattern = new Vector3[] {new Vector3(1,0,0), new Vector3(0,0,2), new Vector3(-1,0,0), new Vector3(0,0,1), new Vector3(0,0,-1)};
     }

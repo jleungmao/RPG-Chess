@@ -11,10 +11,10 @@ public class Rook : Piece
         defense = 0;
         position = new Vector3(0,0,0);
         value = 8;
-        cost = 15;
+        cost = 20;
 
-        movementCooldown = 3;
-        attackCooldown = 3;
+        movementCooldown = 4;
+        attackCooldown = 4;
         attackPattern = generateAttackPattern();
         movementPattern = new Vector3[] {new Vector3(1,0,0), new Vector3(-1,0,0), new Vector3(0,0,1), new Vector3(0,0,-1), new Vector3(0,0,-2)};
     }

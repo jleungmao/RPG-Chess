@@ -9,6 +9,9 @@ public class MainMenu : MonoBehaviour
     [Header("UI")]
     [SerializeField] private GameObject landingPagePanel = null;
     public void HostLobby(){
+        if(networkManager == null){
+            networkManager = GameObject.Find("NetworkManager").GetComponent<ChessNetworkManager>();
+        }
         networkManager.StartHost();
         landingPagePanel.SetActive(false);
     }

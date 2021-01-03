@@ -15,8 +15,8 @@ public class King : Piece
         cost = 0;
         income = 0;
 
-        movementCooldown = 0;
-        attackCooldown = 0;
+        movementCooldown = 1;
+        attackCooldown = 1;
         attackPattern = new Vector3[] {};
         movementPattern = new Vector3[] {};
     }

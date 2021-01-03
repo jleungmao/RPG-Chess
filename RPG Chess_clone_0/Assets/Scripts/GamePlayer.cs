@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using System;
 using Mirror;
 using NameSpaces;
@@ -44,7 +45,6 @@ public class GamePlayer : NetworkBehaviour
     public GameObject queen;
     public GameObject king;
     public GameObject[] pieces;
-
     public Vector3[] tileArray;
     public Shop shop;
     public GameStatus gameStatus = GameStatus.ONGOING;
@@ -118,13 +118,13 @@ public class GamePlayer : NetworkBehaviour
             for(int i = 0; i < Board.rows; i++){
                 PlacePiece(pawn, new Vector3(i, 0, 2));
             }
-            PlacePiece(king, new Vector3(0, 0, 0));
+            PlacePiece(king, new Vector3(3, 0, 0));
 
             playerNumber = 1;
             for(int i = 0; i < Board.rows; i++){
                 PlacePiece(pawn, new Vector3(i, 0, Board.columns - 3));
             }
-            PlacePiece(king, new Vector3(Board.rows-1,0,Board.columns- 1));
+            PlacePiece(king, new Vector3(Board.rows-4,0,Board.columns- 1));
         }
 
         ready = true;
@@ -272,8 +272,8 @@ public class GamePlayer : NetworkBehaviour
     [Command]
     private void CmdSelectHeal(GameObject pieceObject, Vector3[] tileArray, Mode mode,  Vector3 tilePosition){
         Piece clickedPiece = board.GetPiece(tilePosition);
-        Piece selected= pieceObject.GetComponent<Piece>();
-        if((selected.GetComponent<Bishop>() != null) && (clickedPiece.GetPlayer() == playerNumber) && selected.CanAttack()){
+        Piece selected = pieceObject.GetComponent<Piece>();
+        if((selected.GetComponent<Bishop>() != null) && (clickedPiece.GetComponent<King>() == null) && (clickedPiece.GetPlayer() == playerNumber) && selected.CanAttack()){
             if(tileArray != null && Array.Exists(tileArray, attack => attack == tilePosition)){
                 board.AttackSquare(selected, mode, tilePosition);
             }
@@ -307,7 +307,8 @@ public class GamePlayer : NetworkBehaviour
                 int value = board.AttackSquare(selected, mode, tilePosition);
                 board.GetComponent<NetworkIdentity>().RemoveClientAuthority();
                 if(value == -1){
-                    CmdWinGame(playerNumber);
+                    Room.GamePlayers[1-selected.GetComponent<Piece>().GetPlayer()].RpcSetStatus(GameStatus.WIN);
+                    Room.GamePlayers[selected.GetComponent<Piece>().GetPlayer()].RpcSetStatus(GameStatus.LOSE);
                 }else{
                     RpcChangeGold(value);
                 }
@@ -315,12 +316,24 @@ public class GamePlayer : NetworkBehaviour
         }
     }
 
-    [Command]
-    public void CmdWinGame(int playerNumber){   
-        Room.GamePlayers[1-playerNumber].gameStatus = GameStatus.LOSE;
-        Room.GamePlayers[playerNumber].gameStatus = GameStatus.WIN;
+
+    [ClientRpc]
+    public void RpcSetStatus(GameStatus newStatus){
+        gameStatus = newStatus;
     }
-    
+    public void EndGame(){
+        if(isClientOnly){
+            Room.StopClient();
+        }
+        if(isServer){
+            Room.StopHost();
+        }
+        if(gameStatus == GameStatus.WIN){
+            SceneManager.LoadScene("WinScene");
+        }else {
+            SceneManager.LoadScene("LoseScene");
+        }
+    }
     private void SelectPlace(Vector3 tilePosition){
         if(Array.Exists(tileArray, place => place == tilePosition)){
             shop.BuyPiece(tilePosition);
@@ -369,13 +382,7 @@ public class GamePlayer : NetworkBehaviour
         return EventSystem.current.IsPointerOverGameObject();
     }
 
-    public void EndGame(){
-        if(gameStatus == GameStatus.WIN){
-            Debug.Log("You WON!");
-        }else {
-            Debug.Log("You LOST!");
-        }
-    }
+    
 
     
 
@@ -384,27 +391,27 @@ public class GamePlayer : NetworkBehaviour
     }
 
     public void GetKeyPress(){
-        if(Input.GetKeyUp("1") && shop.gold > pawn.GetComponent<Piece>().GetCost()){
+        if(Input.GetKeyUp("1") && shop.gold >= pawn.GetComponent<Piece>().GetCost()){
             shop.SelectPiece("ShopPawn");
             SetMode(Mode.PLACE);
         }
-        if(Input.GetKeyUp("2")&& shop.gold > knight.GetComponent<Piece>().GetCost()){
+        if(Input.GetKeyUp("2")&& shop.gold >= knight.GetComponent<Piece>().GetCost()){
             shop.SelectPiece("ShopKnight");
             SetMode(Mode.PLACE);
         }
-        if(Input.GetKeyUp("3")&& shop.gold > bishop.GetComponent<Piece>().GetCost()){
+        if(Input.GetKeyUp("3")&& shop.gold >= bishop.GetComponent<Piece>().GetCost()){
             shop.SelectPiece("ShopBishop");
             SetMode(Mode.PLACE);
         }
-        if(Input.GetKeyUp("4")&& shop.gold > rook.GetComponent<Piece>().GetCost()){
+        if(Input.GetKeyUp("4")&& shop.gold >= rook.GetComponent<Piece>().GetCost()){
             shop.SelectPiece("ShopRook");
             SetMode(Mode.PLACE);
         }
-        if(Input.GetKeyUp("5")&& shop.gold > queen.GetComponent<Piece>().GetCost()){
+        if(Input.GetKeyUp("5")&& shop.gold >= queen.GetComponent<Piece>().GetCost()){
             shop.SelectPiece("ShopQueen");
             SetMode(Mode.PLACE);
         }
-        if(Input.GetKeyUp("6")&& shop.gold > miner.GetComponent<Piece>().GetCost()){
+        if(Input.GetKeyUp("6")&& shop.gold >= miner.GetComponent<Piece>().GetCost()){
             shop.SelectPiece("ShopMiner");
             SetMode(Mode.PLACE);
         }

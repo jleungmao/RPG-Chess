@@ -7,13 +7,13 @@ public class Bishop : Piece
     public Bishop(){
         maxHealth = 25;
         health = maxHealth;
-        attack = 15;
+        attack = 8;
         defense = 0;
         position = new Vector3(0,0,0);
-        value = 5;
-        cost = 10;
+        value = 8;
+        cost = 25;
 
-        movementCooldown = 2;
+        movementCooldown = 3;
         attackCooldown = 5;
         attackPattern = generateAttackPattern();
         movementPattern = new Vector3[] {new Vector3(1,0,1), new Vector3(-1,0,-1), new Vector3(-1,0,1), new Vector3(1,0,-1)};

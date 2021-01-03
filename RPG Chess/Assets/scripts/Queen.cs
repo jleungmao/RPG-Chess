@@ -10,11 +10,11 @@ public class Queen : Piece
         attack = 15;
         defense = 0;
         position = new Vector3(0,0,0);
-        value = 30;
+        value = 20;
         cost = 60;
 
-        movementCooldown = 3;
-        attackCooldown = 10;
+        movementCooldown = 6;
+        attackCooldown = 12;
         attackPattern = generateAttackPattern();
         movementPattern = generateMovementPattern();
         aoePattern = generateAOEPattern();
